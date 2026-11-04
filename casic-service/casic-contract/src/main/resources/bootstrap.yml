@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: casic-contract
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  cloud:
+    nacos:
+      config:
+        file-extension: yaml

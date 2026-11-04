@@ -1,0 +1,39 @@
+# ==================== Docker 多阶段构建 ====================
+FROM maven:3.8.8-eclipse-temurin-8 AS build
+WORKDIR /app
+
+COPY pom.xml .
+COPY casic-common/pom.xml casic-common/pom.xml
+COPY casic-infra/pom.xml casic-infra/pom.xml
+COPY casic-service/pom.xml casic-service/pom.xml
+
+RUN mvn dependency:go-offline -B -T 1C
+
+COPY casic-common/ casic-common/
+COPY casic-infra/ casic-infra/
+COPY casic-service/ casic-service/
+
+RUN mvn clean package -DskipTests -B -T 1C
+
+# ==================== 运行阶段 ====================
+FROM eclipse-temurin:8-jre-alpine
+
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs"
+
+WORKDIR /app
+
+RUN apk add --no-cache tzdata curl \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && mkdir -p /app/logs
+
+COPY --from=build /app/casic-infra/casic-auth/target/casic-auth.jar /app/app.jar
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8081/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /app/app.jar"]

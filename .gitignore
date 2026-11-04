@@ -1,0 +1,82 @@
+# ===== 通用 =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===== IDE =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# ===== Eclipse =====
+.classpath
+.project
+.settings/
+bin/
+
+# ===== 构建输出 =====
+build/
+out/
+dist/
+
+# ===== 依赖 =====
+*.jar
+*.class
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ===== 日志 =====
+logs/
+*.log
+*.log.*
+
+# ===== 数据库 =====
+*.db
+*.sqlite
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ===== Node.js =====
+node_modules/
+*.tsbuildinfo
+
+# ===== 临时文件 =====
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# ===== Maven Wrapper =====
+mvnw
+mvnw.cmd
+.mvn/wrapper/maven-wrapper.jar
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== 环境配置 =====
+.env
+.env.local
+application-local.yml
+application-dev.yml
+
+# ===== SkyWalking =====
+skywalking-agent/
+agent/

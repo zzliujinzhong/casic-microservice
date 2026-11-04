@@ -1,0 +1,207 @@
+# ==================== 基础设施 ====================
+# Nacos 注册中心 + 配置中心
+nacos:
+  image: nacos/nacos-server:v2.2.3
+  container_name: casic-nacos
+  environment:
+    - MODE=standalone
+    - JVM_XMS=256m
+    - JVM_XMX=512m
+    - PREFER_HOST_MODE=hostname
+  ports:
+    - "8848:8848"
+    - "9848:9848"
+  volumes:
+    - nacos-data:/home/nacos/data
+    - nacos-logs:/home/nacos/logs
+  networks:
+    - casic-network
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/actuator/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 10
+
+# MySQL 数据库
+mysql:
+  image: mysql:8.0.33
+  container_name: casic-mysql
+  environment:
+    - MYSQL_ROOT_PASSWORD=root123
+    - MYSQL_DATABASE=casic
+    - TZ=Asia/Shanghai
+  ports:
+    - "3306:3306"
+  volumes:
+    - mysql-data:/var/lib/mysql
+    - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+  command:
+    - --character-set-server=utf8mb4
+    - --collation-server=utf8mb4_unicode_ci
+    - --default-authentication-plugin=mysql_native_password
+  networks:
+    - casic-network
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+# Redis
+redis:
+  image: redis:7.2-alpine
+  container_name: casic-redis
+  ports:
+    - "6379:6379"
+  volumes:
+    - redis-data:/data
+  command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+  networks:
+    - casic-network
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+# RabbitMQ
+rabbitmq:
+  image: rabbitmq:3.12-management-alpine
+  container_name: casic-rabbitmq
+  environment:
+    - RABBITMQ_DEFAULT_USER=casic
+    - RABBITMQ_DEFAULT_PASS=casic123
+  ports:
+    - "5672:5672"
+    - "15672:15672"
+  volumes:
+    - rabbitmq-data:/var/lib/rabbitmq
+  networks:
+    - casic-network
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+
+# Sentinel 控制台
+sentinel:
+  image: bladex/sentinel-dashboard:1.8.8
+  container_name: casic-sentinel
+  ports:
+    - "8081:8858"
+  environment:
+    - JAVA_OPTS=-Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858
+  networks:
+    - casic-network
+
+# SkyWalking OAP Server
+skywalking-oap:
+  image: apache/skywalking-oap-server:9.0.0-java17
+  container_name: casic-skywalking-oap
+  ports:
+    - "11800:11800"
+    - "12800:12800"
+  environment:
+    - JAVA_OPTS=-Xms256m -Xmx512m
+  volumes:
+    - skywalking-data:/skywalking/oap/logs
+  networks:
+    - casic-network
+
+# SkyWalking UI
+skywalking-ui:
+  image: apache/skywalking-ui:9.0.0-java17
+  container_name: casic-skywalking-ui
+  ports:
+    - "8082:8080"
+  environment:
+    - SW_OAP_ADDRESS=http://skywalking-oap:12800
+  depends_on:
+    - skywalking-oap
+  networks:
+    - casic-network
+
+# ==================== 微服务 ====================
+# API 网关
+casic-gateway:
+  build:
+    context: .
+    dockerfile: ./docker/Dockerfile.gateway
+  container_name: casic-gateway
+  ports:
+    - "8080:8080"
+  environment:
+    - NACOS_SERVER_ADDR=nacos:8848
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - JAVA_OPTS=-Xms256m -Xmx512m
+    - SW_AGENT_COLLECTOR_BACKEND_SERVICES=skywalking-oap:11800
+  depends_on:
+    - nacos
+    - redis
+  networks:
+    - casic-network
+
+# Auth 认证服务
+casic-auth:
+  build:
+    context: .
+    dockerfile: ./docker/Dockerfile.auth
+  container_name: casic-auth
+  ports:
+    - "8081:8081"
+  environment:
+    - NACOS_SERVER_ADDR=nacos:8848
+    - MYSQL_HOST=mysql
+    - MYSQL_PORT=3306
+    - MYSQL_ROOT_PASSWORD=root123
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - JAVA_OPTS=-Xms256m -Xmx512m
+  depends_on:
+    - nacos
+    - mysql
+    - redis
+  networks:
+    - casic-network
+
+# Contract 合同服务
+casic-contract:
+  build:
+    context: .
+    dockerfile: ./docker/Dockerfile.contract
+  container_name: casic-contract
+  ports:
+    - "8083:8082"
+  environment:
+    - NACOS_SERVER_ADDR=nacos:8848
+    - MYSQL_HOST=mysql
+    - MYSQL_PORT=3306
+    - MYSQL_ROOT_PASSWORD=root123
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - RABBITMQ_HOST=rabbitmq
+    - RABBITMQ_PORT=5672
+    - RABBITMQ_USER=casic
+    - RABBITMQ_PASS=casic123
+    - JAVA_OPTS=-Xms256m -Xmx512m
+  depends_on:
+    - nacos
+    - mysql
+    - redis
+    - rabbitmq
+  networks:
+    - casic-network
+
+volumes:
+  nacos-data:
+  nacos-logs:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  skywalking-data:
+
+networks:
+  casic-network:
+    driver: bridge

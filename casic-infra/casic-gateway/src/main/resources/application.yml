@@ -1,0 +1,90 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: casic-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+        file-extension: yaml
+        shared-configs:
+          - data-id: common-redis.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8080}
+      eager: true
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # 认证服务
+        - id: casic-auth
+          uri: lb://casic-auth
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=2
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+        # 合同服务
+        - id: casic-contract
+          uri: lb://casic-contract
+          predicates:
+            - Path=/api/contract/**
+          filters:
+            - StripPrefix=2
+        # 其他业务服务（动态发现）
+        - id: casic-service
+          uri: lb://casic-service
+          predicates:
+            - Path=/api/service/**
+          filters:
+            - StripPrefix=2
+
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+
+# 网关白名单
+casic:
+  gateway:
+    whitelist:
+      - /api/auth/login
+      - /api/auth/register
+      - /actuator/**
+      - /error
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+# Sentinel 网关规则
+spring.cloud.sentinel.scg.fallback:
+  mode: response
+  response-status: 429
+  response-body: '{"code":5001,"msg":"服务限流或降级中","data":null}'
+
+logging:
+  level:
+    org.springframework.cloud.gateway: info
+    com.casic.microservice: debug

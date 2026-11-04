@@ -1,0 +1,58 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: casic-auth
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+        file-extension: yaml
+        shared-configs:
+          - data-id: common-db.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+          - data-id: common-redis.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+
+# JWT 配置
+casic:
+  security:
+    jwt:
+      secret: CASIC-MICROSERVICE-JWT-SECRET-KEY-2024-REPLACE-IN-PRODUCTION
+      expire-seconds: 7200
+      enabled: true
+      whitelist:
+        - /auth/login
+        - /auth/register
+        - /auth/captcha
+        - /actuator/**
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+# MyBatis Plus
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+logging:
+  level:
+    com.casic.microservice: debug
